@@ -1,0 +1,22 @@
+# Stated-Preference-Survey-Brazil
+Repository will includes manuscript and data files of the research: 
+**Estimating the value of travel time saving and statistical life in air travels in Brazil**
+
+
+
+Tatiana Ferrari, Luiza Dusi, Fabiano Pompermayer, Dea Fioravante, Erivelton Guedes.
+
+IPEA - Instituto of Applied Economic Research. Brazil
+
+## Abstract
+
+In this paper, we discuss the methodological procedures and the computation of the value of travel time saving and value of statistical life in air travels in Brazil. A stated preference experiment was carried out, in which we bring some innovations in order to control for hypothetical bias. 
+
+## Keywords
+
+- value of mortality risk reduction 
+- Value of travel time saving 
+- Stated preference 
+- Discrete choice modelling
+
+Draft version
