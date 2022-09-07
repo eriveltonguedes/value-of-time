@@ -1,30 +1,89 @@
 ---
 title: "Report Value of Time"
-author: "Rafael Morais Ludmilla Mattos"
-date: "24/07/2022"
+author: "Ludmilla Mattos e Rafael Morais"
+# date: "24/07/2022"
 output: word_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+# Introdução 
+
+Este estudo tem por objetivo estimar o valor da economia de tempo e a propensão a pagar (*willingess to pay* – WTP) comparando a escolha entre viagens de Avião e Trem de Alta Velocidade - TAV.
+
+# Dados
+
+Os dados foram coletados.... 
+
+[Contextualizar com parte do que está no relatório .\value-of-time\epl\relatorio-final-aeroportos.pdf]
+
+# Método 
+
+Contextualizar modelo de escolha discreta (logistico) e cáclulo de WTP 
+
+$$U_{ij} = C_i + \beta_{ij}Custo + \beta_{ij}Tempo + \varepsilon_i$$
+Multinomial logit? 
+
+
+Formula do WTP: 
+
+# Resultados
+
+Inicialmente descritivas seguidos pelo modelo em si. 
+
+## Descritivas
+###
+
+```{r eval=FALSE}
+
+2/0
+teste
 ```
 
-## R Markdown
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+## Modelo
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
 
-```{r cars}
-summary(cars)
+# Anexo
+
+## Preparação dos dados: 
+```{r DataPrep, eval=FALSE}
+
+library(tidyverse)
+library(readr)
+
+
+# import and consolidade data -------------------------------------------
+
+files <- list.files(path = './data', pattern = '*.csv', full.names = T)
+
+dados1 <- read_csv2(files[1], locale=locale(encoding="latin1")) %>% mutate(fonte = 'Amostra_1')
+dados2 <- read_csv2(files[2], locale=locale(encoding="latin1")) %>% mutate(fonte = 'Amostra_2')
+dados3 <- read_csv2(files[3], locale=locale(encoding="latin1")) %>% mutate(fonte = 'Amostra_3')
+
+dados2 <- dados2 %>% 
+  mutate('Tempo_Av-TAV' = Tempo_avião - Tempo_TAV)
+
+dados3 <- dados3 %>% 
+  mutate('Tempo_Av-TAV' = Tempo_avião - Tempo_TAV)
+
+falta <- names(dados2)[!names(dados2) %in% names(dados1)]
+
+colunas <- c('fonte', 'SbjNum', 'Opção_escolhida', 
+             'Tempo_Av-TAV', 'Tempo_avião', 'Tempo_TAV',
+             'Valor_avião',	'Valor_TAV')
+
+convert_money <- function(x){
+  y <- as.numeric(gsub(',00','', gsub("R\\$ ","", x)))
+  return(y)
+}
+
+dados_all <- dados1 %>% select(colunas) %>% 
+  bind_rows(dados2 %>% select(colunas)) %>% 
+  bind_rows(dados3 %>% select(colunas)) %>% 
+  mutate(Opção_escolhida = ifelse(Opção_escolhida == 'Não sabe/ Não respondeu'
+                                  ,'NSR', Opção_escolhida)
+         ,dif_av_tav = convert_money(Valor_avião) - convert_money(Valor_TAV)
+         )
+
 ```
 
-## Including Plots
 
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
