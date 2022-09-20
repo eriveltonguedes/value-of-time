@@ -6,11 +6,7 @@ EDA
 library(tidyverse)
 library(readr)
 
-
-
-
 # import and consolidade data ---------------------------------------------
-
 files <- list.files(path = './data', pattern = '*.csv', full.names = T)
 
 dados1 <- read_csv2(files[1], locale=locale(encoding="latin1")) %>% mutate(fonte = 'Amostra_1')
@@ -23,16 +19,16 @@ dados2 <- dados2 %>%
 dados3 <- dados3 %>% 
   mutate('Tempo_Av-TAV' = Tempo_avião - Tempo_TAV)
 
-falta <- names(dados2)[!names(dados2) %in% names(dados1)]
-
 colunas <- c('fonte', 'SbjNum', 'Opção_escolhida', 
              'Tempo_Av-TAV', 'Tempo_avião', 'Tempo_TAV',
-             'Valor_avião',	'Valor_TAV')
+             'Valor_avião',	'Valor_TAV',
+             'Q_2', 'Q_57', 'Rota TAV' )
 
 convert_money <- function(x){
-  y <- as.numeric(gsub(',00','', gsub("R\\$ ","", x)))
+  y <- as.numeric(gsub(',00','', gsub("([R\\$.])","", x)))
   return(y)
 }
+
 
 dados_all <- dados1 %>% select(colunas) %>% 
   bind_rows(dados2 %>% select(colunas)) %>% 
@@ -40,77 +36,51 @@ dados_all <- dados1 %>% select(colunas) %>%
   mutate(Opção_escolhida = ifelse(Opção_escolhida == 'Não sabe/ Não respondeu'
                                   ,'NSR', Opção_escolhida)
          ,dif_av_tav = convert_money(Valor_avião) - convert_money(Valor_TAV)
-         )
+         ,valor_aviao = convert_money(Valor_avião)
+         ,usou_milha = case_when(Q_57 == 'Comprada' ~ 0
+                                 ,TRUE ~ 1) ) %>% 
+  group_by(`Rota TAV`, fonte) %>% 
+  mutate(z_valor = (valor_aviao - mean(valor_aviao))/sd(valor_aviao)  ) %>% 
+  ungroup()
 
+(table(dados_all$fonte,dados_all$usou_milha))
 
-choices <- dados_all %>% 
-  group_by(SbjNum) %>% 
-  mutate(choice = row_number()
-         ,opcao_num = case_when(Opção_escolhida == "Avião"  ~ 1
-                               ,Opção_escolhida == "NSR"  ~ 0
-                               ,Opção_escolhida == "Trem de alta velocidade"  ~ -1)
-         ) %>% 
-  ungroup() %>% 
-  select(fonte, SbjNum, `Tempo_Av-TAV`, dif_av_tav, Opção_escolhida, opcao_num, choice) 
-  
-choices <- choices %>% filter(choice == 1) %>% 
-  left_join(choices %>% filter(choice == 2), suffix = c(".1", ".2"), by = c("SbjNum" = "SbjNum", 'fonte' = 'fonte'))
-
-choices <- choices %>% 
-  mutate(d_av_tav = dif_av_tav.1 - dif_av_tav.2
-         ,d_t_av_tav = `Tempo_Av-TAV.1` - `Tempo_Av-TAV.2`
-         ,racional = case_when( (opcao_num.1 - opcao_num.2) > 0 &  
-                               ( 
-                                 (dif_av_tav.1 - dif_av_tav.2) > 0 &
-                                 (`Tempo_Av-TAV.1` - `Tempo_Av-TAV.2`) <= 0
-                                 ) ~ 'Efeito_TAV_mais_caro_e_rapido'
-
-                               ,(opcao_num.1 - opcao_num.2) < 0 &
-                                 (
-                                   (dif_av_tav.1 - dif_av_tav.2) < 0 &
-                                     (`Tempo_Av-TAV.1` - `Tempo_Av-TAV.2`) <= 0
-                                 ) ~ 'Efeito_Avião_mais_caro'
-                               ,TRUE ~ 'OUTROS'
-                               ))
-
-
-choices <- choices %>% 
-  mutate(d_av_tav = dif_av_tav.1 - dif_av_tav.2
-         ,d_t_av_tav = `Tempo_Av-TAV.1` - `Tempo_Av-TAV.2`
-         ,racional = case_when( (opcao_num.1 - opcao_num.2) > 0 &  
-                                  ( 
-                                    # (dif_av_tav.1 - dif_av_tav.2) > 0 &
-                                      (`Tempo_Av-TAV.1` - `Tempo_Av-TAV.2`) > 0
-                                  ) ~ 'Efeito_TAV_mais_caro_e_rapido'
-                                
-                                ,(opcao_num.1 - opcao_num.2) < 0 &
-                                  (
-                                    (dif_av_tav.1 - dif_av_tav.2) < 0 &
-                                      (`Tempo_Av-TAV.1` - `Tempo_Av-TAV.2`) <= 0
-                                  ) ~ 'Efeito_Avião_mais_caro'
-                                ,TRUE ~ 'OUTROS'
-         ))
-
-plot(choices$d_av_tav, choices$d_t_av_tav)
-
-table(choices$racional)
-
-choices %>% filter(racional == 'Efeito_TAV_mais_caro_e_rapido') %>% View()
-check <- choices[choices$racional == 'Efeito_TAV_mais_caro_e_rapido',]$SbjNum
-check <- choices[choices$racional == 'Efeito_Avião_mais_caro',]$SbjNum
-check <- choices[choices$racional == 0,]$SbjNum
 
 dados_all %>%  
-  filter(SbjNum %in% check) %>% 
   ggplot( aes(x=`Tempo_Av-TAV`, y=dif_av_tav, color=Opção_escolhida)) +
-  geom_point(size=2) + 
-  geom_line(aes(group = SbjNum))
+  geom_point(size=2)  
 
 
-table(dados_all$Opção_escolhida)
-hist(dados_all$`Tempo_Av-TAV`, 50)
-hist(dados_all$dif_av_tav, 50)
+dados_all %>%  
+  ggplot( aes(x=`Tempo_Av-TAV`, y=z_valor, color=Opção_escolhida)) +
+  geom_point(size=2)  
 
+
+
+
+
+library(ggpubr)
+sp <- ggscatter(dados_all, x = "Tempo_Av-TAV", y = "dif_av_tav",
+                color = "Opção_escolhida", palette = "jco",
+                size = 3, alpha = 0.6)+
+  border()                                         
+# Marginal density plot of x (top panel) and y (right panel)
+xplot <- ggdensity(dados_all, "Tempo_Av-TAV", fill = "Opção_escolhida",
+                   palette = "jco")
+yplot <- ggdensity(dados_all, "dif_av_tav", fill = "Opção_escolhida", 
+                   palette = "jco")+
+  rotate()
+# Cleaning the plots
+yplot <- yplot + clean_theme() 
+xplot <- xplot + clean_theme()
+# Arranging the plot
+ggarrange(xplot, NULL, sp, yplot, 
+          ncol = 2, nrow = 2,  align = "hv", 
+          widths = c(2, 1), heights = c(1, 2),
+          common.legend = TRUE)
+
+
+# Identificando mudança de escolha ----------------------------------------
 d = dados_all %>% 
   select(Opção_escolhida, SbjNum) %>% 
   mutate(ind = 1) %>% 
@@ -137,7 +107,76 @@ dados_all %>%
   geom_point(size=2) + 
   geom_line(aes(group = SbjNum))
 
+dados_all %>% 
+  distinct(SbjNum, Q_2, Opção_escolhida) %>% 
+  group_by(Q_2) %>% 
+  summarise(TOT = n()
+            ,Av = sum(ifelse(Opção_escolhida == 'Avião', 1, 0))
+            ,p_Av = round(Av/TOT, 3) ) %>% 
+  arrange(desc(p_Av))
 
+
+dados_all %>% 
+  distinct(SbjNum, `Rota TAV`, Opção_escolhida) %>% 
+  group_by(`Rota TAV`) %>% 
+  summarise(TOT = n()
+            ,Av = sum(ifelse(Opção_escolhida == 'Avião', 1, 0))
+            ,p_Av = round(Av/TOT, 3) ) %>% 
+  arrange(desc(p_Av))
+
+
+
+# Avaliando tipo de escolha -----------------------------------------------
+choices <- dados_all %>% 
+  filter(SbjNum %in% mudou_ideia) %>% 
+  arrange(SbjNum, Opção_escolhida) %>% 
+  group_by(SbjNum) %>% 
+  mutate(choice = row_number()
+         ,opcao_num = case_when(Opção_escolhida == "Avião"  ~ 3
+                                ,Opção_escolhida == "NSR"  ~ 2
+                                ,Opção_escolhida == "Trem de alta velocidade"  ~ 1)
+  ) %>% 
+  ungroup() %>% 
+  select(fonte, SbjNum, `Tempo_Av-TAV`, dif_av_tav, Opção_escolhida, opcao_num, choice) 
+
+choices <- choices %>% filter(choice == 1) %>% 
+  left_join(choices %>% filter(choice == 2), suffix = c(".1", ".2"), by = c("SbjNum" = "SbjNum", 'fonte' = 'fonte'))
+
+choices <- choices %>% 
+  mutate(irracional = case_when((dif_av_tav.1 - dif_av_tav.2 >= 0 &
+                                   `Tempo_Av-TAV.1` - `Tempo_Av-TAV.2` > 0 &
+                                   opcao_num.1 - opcao_num.2 > 0 ) ~ 1 
+                                , TRUE ~ 0)
+  )
+
+
+dados_all <- dados_all %>%  
+  mutate(escolhas = case_when(SbjNum %in% mudou_ideia ~ 'mudou'
+                              ,TRUE ~ 'igual' )
+         ,tp_escolha = case_when(SbjNum %in% choices[choices$irracional == 1,]$SbjNum ~ 'Irracional',
+                                TRUE ~ 'Racional')
+         )
+
+dados_all %>% 
+  filter(escolhas == 'mudou') %>% 
+  ggplot( aes(x=`Tempo_Av-TAV`, y=dif_av_tav, color=Opção_escolhida)) +
+  geom_point(size=2) + 
+  geom_line(aes(group = SbjNum)) + 
+  facet_grid(tp_escolha ~ .) + 
+  theme(legend.position="bottom")
+
+table(choices$irracional)
+prop.table(table(choices$irracional))
+
+dados_all %>% 
+  distinct(SbjNum, Q_2, escolhas, tp_escolha) %>% 
+  group_by(Q_2) %>% 
+  summarise(TOT = n()
+            ,mudou = sum(ifelse(escolhas == 'mudou', 1, 0))
+            ,p_mudou = round(mudou/TOT, 3)
+            ,racional = sum(ifelse(tp_escolha == 'Racional' & escolhas == 'mudou', 1, 0))
+            ,p_racional = round(racional/TOT, 3)) %>% 
+  arrange(desc(p_racional))
 
 # Testes ------------------------------------------------------------------
 
